@@ -62,3 +62,5 @@ GitHub Actions 執行 adapter 測試、C# 編譯與安裝腳本檢查；不會�
 本次 0.1.0-preview.1 已驗證 Windows 開發機核心輸入、原生 DLL 載入、CapsLock 邏輯、面板互動、C# 編譯與安裝包完整性。未完成乾淨 Windows VM 的首次安裝／解除安裝測試，也未測試 Windows ARM64、多使用者、每一個應用程式或實體重開機後的啟動行為。不要把 `-ValidateOnly` 當作完整安裝成功證據。
 
 本庫採元件各自授權。發布時保留 `LICENSES/`、`THIRD_PARTY_NOTICES.md`、完整修改後的來源與建置腳本；不要上傳個人 `%APPDATA%/PIME`、個人詞庫、輸入測試紀錄或含帳號的設定快照。
+
+實際後端訊息測試：準備好 runtime 後，執行 python tests/RuntimeSmoke.py。此測試使用暫存使用者資料，檢查初始設定載入、首個音節、工作列圖示、注音確認、emoji 原子提交與英文模式，不使用個人詞庫。

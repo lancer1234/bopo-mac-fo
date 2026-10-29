@@ -1,6 +1,10 @@
-# bopo MAC fo
+# ㄅㄆMac ㄈ · bopo MAC fo
 
-**把熟悉的選字節奏，帶到 Windows。**
+**把 Mac 的注音輸入邏輯，帶到 Windows。**
+
+由 [MAKOTO LAB](https://makotolab.tw/) 整合與維護的開源 Windows 注音輸入法，為經常在 Mac 與 PC 之間切換的人，保留熟悉的選字方向與中英切換節奏。
+
+[官方專案介紹](https://makotolab.tw/projects/bopo-mac-fo/) · [English](docs/README.en.md)
 
 以 [小麥注音／McBopomofoWeb](https://github.com/openvanilla/McBopomofoWeb) 與 [PIME](https://github.com/EasyIME/PIME) 為基礎，調整成更接近 Mac 習慣的 Windows 注音輸入體驗：精簡暗色候選框、CapsLock 中英切換，以及可以放在旁邊點選的 emoji 圖庫。
 
@@ -51,7 +55,7 @@
 
 ## 解除安裝與資料
 
-在 Windows「已安裝的應用程式」找到 **bopo MAC fo** 解除安裝，會停止輔助程式並還原備份設定、原本的 PIME 服務與輸入法清單。詞庫、備份與 PIME 前置元件會保留；已載入的程式檔需重新登入後才會卸載，剩餘檔案可參考[回復教學](docs/QUICKSTART.md#解除安裝與回復)。預覽版更新請先解除安裝舊版。
+在 Windows「已安裝的應用程式」找到 **ㄅㄆMac ㄈ（bopo MAC fo）** 解除安裝，會停止輔助程式並還原備份設定、原本的 PIME 服務與輸入法清單。詞庫、備份與 PIME 前置元件會保留；已載入的程式檔需重新登入後才會卸載，剩餘檔案可參考[回復教學](docs/QUICKSTART.md#解除安裝與回復)。預覽版更新請先解除安裝舊版。
 
 輸入內容與個人詞庫只在本機處理，不含遙測。公開程式庫及安裝包**不包含開發者的個人詞庫、輸入紀錄或帳號資訊**。
 

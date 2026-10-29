@@ -410,28 +410,18 @@ class PimeMcBopomofo {
    * @param callback The callback function.
    */
   public loadSettings(callback: () => void): void {
-    fs.readFile(this.userSettingsPath, (err, data) => {
-      if (err) {
-        console.log(
-          "Unable to read user settings from " + this.userSettingsPath,
-        );
-        this.writeSettings();
-        return;
-      }
-      console.log(data);
-      try {
-        console.log("Try to load settings");
-        const newSettings = JSON.parse(data.toString());
-        this.settings = Object.assign({}, defaultSettings, newSettings);
-        console.log(
-          "Loaded settings: " + JSON.stringify(this.settings, null, 2),
-        );
-        this.applySettings();
-      } catch {
-        console.error("Failed to parse settings");
-        this.writeSettings();
-      }
-    });
+    // A new NIME connection can receive keys immediately. Finish this tiny
+    // local read before accepting them, instead of resetting a partial syllable
+    // when an asynchronous settings callback eventually runs.
+    try {
+      const newSettings = JSON.parse(fs.readFileSync(this.userSettingsPath, "utf8"));
+      this.settings = Object.assign({}, defaultSettings, newSettings);
+      this.applySettings();
+    } catch (error) {
+      console.error("Unable to load user settings", error);
+      this.writeSettings();
+    }
+    callback();
   }
 
   /** Write settings to disk */
@@ -441,7 +431,7 @@ class PimeMcBopomofo {
         "User data folder not found, creating " + this.mcBopomofoUserDataPath,
       );
       console.log("Creating one");
-      fs.mkdirSync(this.mcBopomofoUserDataPath);
+      fs.mkdirSync(this.mcBopomofoUserDataPath, { recursive: true });
     }
 
     console.log("Writing user settings to " + this.userSettingsPath);

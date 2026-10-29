@@ -1,4 +1,4 @@
-param([string]$NpmCommand='npm')
+﻿param([string]$NpmCommand='npm')
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot
 $runtime=Join-Path $repo 'runtime\node'
@@ -22,6 +22,7 @@ $engine=Join-Path $repo 'upstream\McBopomofoWeb\output\pime'
 $ime=Join-Path $runtime 'input_methods\mcbopomofo'
 New-Item -ItemType Directory -Path $ime -Force | Out-Null
 foreach($file in @('index.js','index.js.LICENSE.txt','icon.ico')){Copy-Item -LiteralPath (Join-Path $engine $file) -Destination $ime -Force}
-$info=[ordered]@{name='bopo MAC fo';version='0.1.0';guid='{5340c1d9-706e-4b6b-b022-2e763fa5f674}';locale='zh-Hant-TW';fallbackLocale='zh-TW';icon='icon.ico';win8_icon='';moduleName='index';serviceName='';configTool='';configToolParams='';configToolDir=''}
+Copy-Item -LiteralPath (Join-Path $engine 'icons') -Destination $ime -Recurse -Force
+$info=[ordered]@{name='ㄅㄆMac ㄈ (bopo MAC fo)';version='0.1.0';guid='{5340c1d9-706e-4b6b-b022-2e763fa5f674}';locale='zh-Hant-TW';fallbackLocale='zh-TW';icon='icon.ico';win8_icon='';moduleName='index';serviceName='';configTool='';configToolParams='';configToolDir=''}
 [IO.File]::WriteAllText((Join-Path $ime 'ime.json'),($info|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
 'Runtime prepared; use tools/download-emoji.py to prepare images.'

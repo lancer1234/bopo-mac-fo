@@ -1,6 +1,6 @@
 # 致謝與第三方授權
 
-bopo MAC fo 由 [lancer1234](https://github.com/lancer1234) 整合與維護，開發過程使用 OpenAI Codex 協助。注音引擎、詞庫、Windows 輸入法框架和表情圖案來自下列專案；本專案不主張這些是自行原創。
+ㄅㄆMac ㄈ（bopo MAC fo）由 [MAKOTO LAB](https://makotolab.tw/)／[lancer1234](https://github.com/lancer1234) 整合與維護，開發過程使用 OpenAI Codex 協助。注音引擎、詞庫、Windows 輸入法框架和表情圖案來自下列專案；本專案不主張這些是自行原創。
 
 | 專案與作者 | 使用範圍 | 授權／本專案保存位置 |
 |---|---|---|

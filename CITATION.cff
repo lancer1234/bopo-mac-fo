@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you reference this project, cite ㄅㄆMac ㄈ / bopo MAC fo by MAKOTO LAB and retain the upstream credits."
+title: "ㄅㄆMac ㄈ / bopo MAC fo"
+type: software
+authors:
+  - name: MAKOTO LAB
+    website: https://makotolab.tw/
+version: 0.1.0-preview.1
+date-released: 2026-10-30
+url: https://makotolab.tw/projects/bopo-mac-fo/
+repository-code: https://github.com/lancer1234/bopo-mac-fo
+license: GPL-2.0-only
+abstract: "An open-source Windows Bopomofo input project that brings familiar Mac-style candidate selection and CapsLock switching to Windows, built on McBopomofoWeb and PIME."
+keywords:
+  - Bopomofo
+  - Zhuyin
+  - Windows
+  - Mac
+  - Traditional Chinese input method
+  - MAKOTO LAB

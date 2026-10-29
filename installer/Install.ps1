@@ -1,4 +1,4 @@
-param([switch]$Exclusive,[switch]$ValidateOnly,[string]$UserSid)
+﻿param([switch]$Exclusive,[switch]$ValidateOnly,[string]$UserSid)
 $ErrorActionPreference='Stop'
 Import-Module (Join-Path $PSScriptRoot 'Package.psm1') -Force
 $packageRoot=Split-Path $PSScriptRoot
@@ -91,7 +91,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $packageRoot 'LICENSES') -Destination $product -Recurse -Force
     $uninstall='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BopoMacFo'
     New-Item -Path $uninstall -Force | Out-Null
-    $properties=@{DisplayName='bopo MAC fo';DisplayVersion=$manifest.version;Publisher='lancer1234 and upstream contributors';InstallLocation=$product;URLInfoAbout='https://github.com/lancer1234/bopo-mac-fo';UninstallString=('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+$product+'\Uninstall.ps1"')}
+    $properties=@{DisplayName='ㄅㄆMac ㄈ（bopo MAC fo）';DisplayVersion=$manifest.version;Publisher='MAKOTO LAB and upstream contributors';InstallLocation=$product;URLInfoAbout='https://github.com/lancer1234/bopo-mac-fo';UninstallString=('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+$product+'\Uninstall.ps1"')}
     foreach($key in $properties.Keys){New-ItemProperty -LiteralPath $uninstall -Name $key -PropertyType String -Value $properties[$key] -Force | Out-Null}
     'Installation complete. Reopen applications to load the new input service.'
 }catch{

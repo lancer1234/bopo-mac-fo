@@ -3,12 +3,14 @@ jest.mock("fs", () => ({
   readFile: jest.fn((file: string, callback: Function) =>
     callback(null, Buffer.from(file.endsWith("config.json") ? "{}" : "")),
   ),
+  readFileSync: jest.fn(() => Buffer.from("{}")),
   watch: jest.fn(),
   writeFile: jest.fn(),
 }));
 
-const adapter = () => {
+const adapter = (prepare?: () => void) => {
   jest.resetModules();
+  prepare?.();
   const service = require("./pime");
   let seqNum = 0;
   const send = (method: string, extra: any = {}) =>
@@ -43,6 +45,19 @@ const adapter = () => {
 
 beforeEach(() => jest.spyOn(console, "log").mockImplementation(() => {}));
 afterEach(() => jest.restoreAllMocks());
+
+test("initial settings cannot arrive late and erase the first phonetic key", () => {
+  const pending: Array<() => void> = [];
+  const ime=adapter(() => {
+    const fs=require("fs");
+    fs.readFile.mockImplementation((file: string,callback: Function) => {
+      if(file.endsWith("config.json")) pending.push(() => callback(null,Buffer.from("{}")));
+      else callback(null,Buffer.from(""));
+    });
+  });
+  ime.type("s");pending.forEach(complete => complete());
+  expect(ime.type("u3").down.compositionString).toBe("你");
+});
 
 test("floating emoji relay preserves pending Chinese and language mode", () => {
   const ime=adapter();ime.type("su3cl3");

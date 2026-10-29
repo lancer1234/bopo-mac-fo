@@ -35,7 +35,7 @@ public sealed class EmojiBrowser : Form {
   protected override bool ShowWithoutActivation {get{return true;}}
   protected override CreateParams CreateParams {get{var p=base.CreateParams;p.ExStyle|=0x08000000;return p;}}
   public EmojiBrowser(){
-    Text="bopo MAC fo · 表情符號";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=true;TopMost=true;
+    Text="ㄅㄆMac ㄈ · 表情符號";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=true;TopMost=true;
     ClientSize=new Size(344,466);BackColor=Color.FromArgb(36,36,40);DoubleBuffered=true;StartPosition=FormStartPosition.Manual;
     var area=Screen.PrimaryScreen.WorkingArea;Location=new Point(area.Right-Width-24,area.Bottom-Height-24);
     foreach(string line in File.ReadAllLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"catalog.tsv"),System.Text.Encoding.UTF8)){var fields=line.Split('\t');if(fields.Length>=3)all.Add(new Entry {Id=all.Count,Emoji=fields[0],Words=fields[1],Category=fields[2]});}

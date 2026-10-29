@@ -20,6 +20,15 @@ jobs:
       - run: pnpm exec jest src/pime.test.ts --runInBand
       - run: pnpm exec eslint src/pime.ts src/pime.test.ts
       - run: pnpm run build:pime
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare the isolated backend runtime
+        working-directory: .
+        run: ./tools/prepare-runtime.ps1
+      - name: Exercise actual NIME messages in a temporary user profile
+        working-directory: .
+        run: python tests/RuntimeSmoke.py
   windows-tools:
     runs-on: windows-latest
     steps:

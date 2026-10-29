@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -11,10 +11,10 @@ public sealed class Setup : Form {
  readonly Button install=new Button(),cancel=new Button();readonly Label status=new Label();
  readonly string root=AppDomain.CurrentDomain.BaseDirectory;bool busy;
  public Setup(){
-  Text="bopo MAC fo · 安裝";ClientSize=new Size(580,420);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
+  Text="ㄅㄆMac ㄈ · 安裝";ClientSize=new Size(580,420);StartPosition=FormStartPosition.CenterScreen;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;
   BackColor=Color.FromArgb(36,36,40);ForeColor=Color.FromArgb(238,238,242);Font=new Font("Microsoft JhengHei UI",10);
-  var title=new Label {Text="bopo MAC fo",Font=new Font("Segoe UI",25,FontStyle.Bold),Location=new Point(28,25),AutoSize=true};Controls.Add(title);
-  var subtitle=new Label {Text="把熟悉的選字節奏，帶到 Windows。",Location=new Point(30,85),AutoSize=true};Controls.Add(subtitle);
+  var title=new Label {Text="ㄅㄆMac ㄈ",Font=new Font("Microsoft JhengHei UI",25,FontStyle.Bold),Location=new Point(28,25),AutoSize=true};Controls.Add(title);
+  var subtitle=new Label {Text="把 Mac 的注音輸入邏輯，帶到 Windows。",Location=new Point(30,85),AutoSize=true};Controls.Add(subtitle);
   var features=new Label {Text="暗色候選框  ·  CapsLock 中英切換  ·  3,944 個 emoji",Location=new Point(30,121),AutoSize=true,ForeColor=Color.FromArgb(176,176,188)};Controls.Add(features);
   keep.Text="保留其他輸入法，將 bopo MAC fo 設為預設";keep.Checked=true;keep.SetBounds(30,177,520,28);Controls.Add(keep);
   exclusive.Text="只使用 bopo MAC fo，停用其他輸入法";exclusive.SetBounds(30,211,520,28);Controls.Add(exclusive);
