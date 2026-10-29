@@ -15,7 +15,7 @@
 ```powershell
 python tools/generate-data.py
 Set-Location upstream/McBopomofoWeb
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm exec jest src/pime.test.ts --runInBand
 pnpm run build:pime
 Set-Location ../..

@@ -16,7 +16,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: '11.25.0'
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm exec jest src/pime.test.ts --runInBand
       - run: pnpm exec eslint src/pime.ts src/pime.test.ts
       - run: pnpm run build:pime
@@ -38,12 +38,12 @@ jobs:
         shell: powershell
         run: |
           $csc="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-          & $csc /nologo /target:winexe /out:Setup.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll src/Setup.cs
+          & $csc /nologo /codepage:65001 /target:winexe /out:Setup.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $env:GITHUB_WORKSPACE 'src\Setup.cs')
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          & $csc /nologo /target:winexe /out:CapsSwitch.exe /r:System.Windows.Forms.dll src/helpers/CapsSwitch.cs src/helpers/CapsGesture.cs
+          & $csc /nologo /codepage:65001 /target:winexe /out:CapsSwitch.exe /r:System.Windows.Forms.dll (Join-Path $env:GITHUB_WORKSPACE 'src\helpers\CapsSwitch.cs') (Join-Path $env:GITHUB_WORKSPACE 'src\helpers\CapsGesture.cs')
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          & $csc /nologo /target:winexe /out:EmojiPalette.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll src/helpers/EmojiBrowser.cs
+          & $csc /nologo /codepage:65001 /target:winexe /out:EmojiPalette.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $env:GITHUB_WORKSPACE 'src\helpers\EmojiBrowser.cs')
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          & $csc /nologo /target:exe /out:CapsGestureTest.exe src/helpers/CapsGesture.cs tests/CapsGestureTest.cs
+          & $csc /nologo /codepage:65001 /target:exe /out:CapsGestureTest.exe (Join-Path $env:GITHUB_WORKSPACE 'src\helpers\CapsGesture.cs') (Join-Path $env:GITHUB_WORKSPACE 'tests\CapsGestureTest.cs')
           if($LASTEXITCODE){exit $LASTEXITCODE}
           ./CapsGestureTest.exe

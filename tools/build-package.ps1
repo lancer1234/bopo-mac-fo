@@ -10,11 +10,11 @@ $payload=Join-Path $OutputDirectory 'payload'
 $helpers=Join-Path $payload 'helpers'
 New-Item -ItemType Directory -Path $helpers -Force | Out-Null
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-& $compiler /nologo /target:winexe ('/out:'+(Join-Path $OutputDirectory 'Setup.exe')) /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $repo 'src\Setup.cs')
+& $compiler /nologo /codepage:65001 /target:winexe ('/out:'+(Join-Path $OutputDirectory 'Setup.exe')) /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $repo 'src\Setup.cs')
 if($LASTEXITCODE -ne 0){throw 'Setup compilation failed.'}
-& $compiler /nologo /target:winexe ('/out:'+(Join-Path $helpers 'CapsSwitch.exe')) /r:System.Windows.Forms.dll (Join-Path $repo 'src\helpers\CapsSwitch.cs') (Join-Path $repo 'src\helpers\CapsGesture.cs')
+& $compiler /nologo /codepage:65001 /target:winexe ('/out:'+(Join-Path $helpers 'CapsSwitch.exe')) /r:System.Windows.Forms.dll (Join-Path $repo 'src\helpers\CapsSwitch.cs') (Join-Path $repo 'src\helpers\CapsGesture.cs')
 if($LASTEXITCODE -ne 0){throw 'Caps helper compilation failed.'}
-& $compiler /nologo /target:winexe ('/out:'+(Join-Path $helpers 'EmojiPalette.exe')) /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $repo 'src\helpers\EmojiBrowser.cs')
+& $compiler /nologo /codepage:65001 /target:winexe ('/out:'+(Join-Path $helpers 'EmojiPalette.exe')) /r:System.Windows.Forms.dll /r:System.Drawing.dll (Join-Path $repo 'src\helpers\EmojiBrowser.cs')
 if($LASTEXITCODE -ne 0){throw 'Emoji helper compilation failed.'}
 Copy-Item -LiteralPath (Join-Path $repo 'data\catalog.tsv') -Destination $helpers
 Copy-Item -LiteralPath (Join-Path $repo 'runtime\Emoji') -Destination (Join-Path $helpers 'Emoji') -Recurse
