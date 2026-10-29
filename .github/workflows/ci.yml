@@ -1,0 +1,49 @@
+name: Checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  adapter:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: upstream/McBopomofoWeb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec jest src/pime.test.ts --runInBand
+      - run: pnpm exec eslint src/pime.ts src/pime.test.ts
+      - run: pnpm run build:pime
+  windows-tools:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse scripts and test package integrity checks
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($file in Get-ChildItem installer,tools,tests -Recurse -File -Include *.ps1,*.psm1){
+            $tokens=$null;$errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            if($errors.Count){throw ($errors | Out-String)}
+          }
+          ./tests/Package.Tests.ps1
+      - name: Compile helpers and setup; test CapsLock timing
+        shell: powershell
+        run: |
+          $csc="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /target:winexe /out:Setup.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll src/Setup.cs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          & $csc /nologo /target:winexe /out:CapsSwitch.exe /r:System.Windows.Forms.dll src/helpers/CapsSwitch.cs src/helpers/CapsGesture.cs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          & $csc /nologo /target:winexe /out:EmojiPalette.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll src/helpers/EmojiBrowser.cs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          & $csc /nologo /target:exe /out:CapsGestureTest.exe src/helpers/CapsGesture.cs tests/CapsGestureTest.cs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          ./CapsGestureTest.exe

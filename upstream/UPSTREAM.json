@@ -1,0 +1,32 @@
+{
+  "McBopomofoWeb": {
+    "url": "https://github.com/openvanilla/McBopomofoWeb",
+    "commit": "95eb5ec69f3a59d6be6914de0b285c1d0989da47",
+    "license": "MIT; local distribution also contains GPL-2.0 IDS data"
+  },
+  "PIME": {
+    "url": "https://github.com/EasyIME/PIME",
+    "commit": "26fcf6ac8874e76b8f75f6826811b03bfdfc2e89",
+    "license": "LGPL; preserve per-file notices"
+  },
+  "libIME2": {
+    "url": "https://github.com/EasyIME/libIME2",
+    "commit": "8ad3c9b433d930ce5614c483461dfa78cedb5efd",
+    "license": "LGPL-2.1-or-later"
+  },
+  "jsoncpp": {
+    "url": "https://github.com/open-source-parsers/jsoncpp",
+    "commit": "ddabf50f72cf369bf652a95c4d9fe31a1865a781",
+    "license": "MIT"
+  },
+  "FluentEmoji": {
+    "url": "https://github.com/microsoft/fluentui-emoji",
+    "commit": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+    "license": "MIT"
+  },
+  "Unicode": {
+    "url": "https://www.unicode.org/Public/17.0.0/",
+    "version": "17.0.0",
+    "license": "Unicode-3.0"
+  }
+}

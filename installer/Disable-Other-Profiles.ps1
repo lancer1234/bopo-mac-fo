@@ -1,0 +1,45 @@
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[ComImport,Guid("71C6E74C-0F28-11D8-A82A-00065B84435C"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IProfileSwitch {
+ [PreserveSig] int ActivateProfile(uint type,ushort lang,ref Guid clsid,ref Guid profile,IntPtr hkl,uint flags);
+ [PreserveSig] int DeactivateProfile(uint type,ushort lang,ref Guid clsid,ref Guid profile,IntPtr hkl,uint flags);
+}
+[ComImport,Guid("1F02B6C5-7842-4EE6-8A0B-9A24183A95CA"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IUserProfiles {
+ void Register(); void Unregister(); void AddLanguageProfile(); void RemoveLanguageProfile();
+ void EnumInputProcessorInfo(); void GetDefaultLanguageProfile();
+ [PreserveSig] int SetDefaultLanguageProfile(ushort lang,ref Guid clsid,ref Guid profile);
+ void ActivateLanguageProfile(); void GetActiveLanguageProfile(); void GetLanguageProfileDescription();
+ void GetCurrentLanguage(); void ChangeCurrentLanguage(); void GetLanguageList(); void EnumLanguageProfiles();
+ [PreserveSig] int EnableLanguageProfile(ref Guid clsid,ushort lang,ref Guid profile,[MarshalAs(UnmanagedType.Bool)]bool enable);
+ [PreserveSig] int IsEnabledLanguageProfile(ref Guid clsid,ushort lang,ref Guid profile,[MarshalAs(UnmanagedType.Bool)]out bool enabled);
+}
+public static class ProfileCleanup {
+ public static string Run() {
+  var instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("33C53A50-F456-4884-B049-85FD643ECFED")));
+  var manager=(IProfileSwitch)instance; var profiles=(IUserProfiles)instance;
+  Guid pime=new Guid("35F67E9D-A54D-4177-9697-8B0AB71A9E04"),mcb=new Guid("5340C1D9-706E-4B6B-B022-2E763FA5F674");
+  int activation=manager.ActivateProfile(1,0x0404,ref pime,ref mcb,IntPtr.Zero,0x20000001);
+  Marshal.ThrowExceptionForHR(activation);
+  string report="McBopomofo activation="+activation+Environment.NewLine;
+  Guid[] clsids={new Guid("B115690A-EA02-48D5-A231-E3578D2FDF80"),pime};
+  Guid[] ids={new Guid("B2F9C502-1742-11D4-9790-0080C882687E"),new Guid("F80736AA-28DB-423A-92C9-5540F501C939")};
+  string[] names={"Microsoft Bopomofo","Chewing"};
+  for(int i=0;i<ids.Length;i++) {
+   Guid clsid=clsids[i],profile=ids[i];
+   int disable=manager.DeactivateProfile(1,0x0404,ref clsid,ref profile,IntPtr.Zero,0x20000002);
+   int enable=profiles.EnableLanguageProfile(ref clsid,0x0404,ref profile,false);
+   bool enabled; int query=profiles.IsEnabledLanguageProfile(ref clsid,0x0404,ref profile,out enabled);
+   report+=names[i]+": deactivate="+disable+", enable="+enable+", query="+query+", enabled="+enabled+Environment.NewLine;
+   Marshal.ThrowExceptionForHR(enable); Marshal.ThrowExceptionForHR(query);
+   if(enabled)throw new Exception(names[i]+" is still enabled");
+  }
+  Marshal.ThrowExceptionForHR(profiles.SetDefaultLanguageProfile(0x0404,ref pime,ref mcb));
+  Marshal.ReleaseComObject(instance);
+  return report;
+ }
+}
+'@
+[ProfileCleanup]::Run()

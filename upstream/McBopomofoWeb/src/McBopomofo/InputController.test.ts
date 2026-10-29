@@ -1,0 +1,1372 @@
+import { CtrlEnterOption } from "./CtrlEnterOption";
+import { InputController, MovingCursorOption } from "./InputController";
+import {
+  Big5,
+  ChoosingCandidate,
+  ChoosingPunctuationList,
+  Committing,
+  CustomMenu,
+  Empty,
+  EmptyIgnoringPrevious,
+  InputState,
+  Inputting,
+  Iroha,
+  IrohaCandidate,
+  Marking,
+  NumberInput,
+  SelectingDateMacro,
+  SelectingDictionary,
+  SelectingFeature,
+  ShowingCharInfo,
+} from "./InputState";
+import { Key, KeyName } from "./Key";
+
+// Mock InputUI interface for testing
+interface MockInputUI {
+  reset: jest.Mock;
+  commitString: jest.Mock;
+  update: jest.Mock;
+}
+
+function createMockUI(): MockInputUI {
+  return {
+    reset: jest.fn(),
+    commitString: jest.fn(),
+    update: jest.fn(),
+  };
+}
+
+function inputCStr(controller: InputController, str: string) {
+  for (let i = 0; i < str.length; i++) {
+    inputChar(controller, str[i]);
+  }
+}
+
+function inputChar(controller: InputController, char: string): boolean {
+  let key = Key.asciiKey(char, false, false);
+  if (char === " ") {
+    key = new Key(" ", KeyName.SPACE, false, false);
+  }
+  return controller.mcbopomofoKeyEvent(key);
+}
+
+function inputKey(
+  controller: InputController,
+  keyName: KeyName,
+  ascii: string = "",
+  shiftPressed: boolean = false,
+  ctrlPressed: boolean = false
+) {
+  const key = new Key(ascii, keyName, shiftPressed, ctrlPressed);
+  return controller.mcbopomofoKeyEvent(key);
+}
+
+describe("InputController", () => {
+  let controller: InputController;
+  let mockUI: MockInputUI;
+  let lastState: string = "";
+
+  beforeEach(() => {
+    mockUI = createMockUI();
+    mockUI.update.mockImplementation((state: string) => {
+      lastState = state;
+    });
+    controller = new InputController(mockUI as any);
+  });
+
+  describe("Basic Functionality", () => {
+    it("initializes with empty state", () => {
+      expect(controller.state).toBeInstanceOf(Empty);
+    });
+
+    it("resets to empty state", () => {
+      // Input some text first
+      inputCStr(controller, "5j/");
+      expect(controller.state).not.toBeInstanceOf(Empty);
+
+      // Reset
+      controller.reset();
+      expect(controller.state).toBeInstanceOf(Empty);
+      expect(mockUI.reset).toHaveBeenCalled();
+    });
+
+    it("returns boolean from keyboard events", () => {
+      // Test direct mcbopomofoKeyEvent method instead of keyEvent
+      const key = Key.asciiKey("a", false, false);
+      const result = controller.mcbopomofoKeyEvent(key);
+      expect(typeof result).toBe("boolean");
+    });
+
+    it("ignores modifier keys", () => {
+      const shiftKey = Key.asciiKey("Shift", false, false);
+      const metaKey = Key.asciiKey("Meta", false, false);
+      const altKey = Key.asciiKey("Alt", false, false);
+
+      expect(controller.mcbopomofoKeyEvent(shiftKey)).toBe(false);
+      expect(controller.mcbopomofoKeyEvent(metaKey)).toBe(false);
+      expect(controller.mcbopomofoKeyEvent(altKey)).toBe(false);
+    });
+  });
+
+  describe("Configuration Methods", () => {
+    it("sets traditional mode", () => {
+      controller.setTraditionalMode(true);
+      inputCStr(controller, "5j/ ");
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      let key = Key.asciiKey("1", false, false);
+      controller.mcbopomofoKeyEvent(key);
+      expect(controller.state).toBeInstanceOf(Committing);
+      state = controller.state;
+      if (state instanceof Committing) {
+        expect(state.text).toBe("中");
+      }
+
+      controller.setTraditionalMode(false);
+      inputCStr(controller, "5j/ ");
+      state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+      key = new Key(" ", KeyName.SPACE, false, false);
+      controller.mcbopomofoKeyEvent(key);
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+      key = Key.asciiKey("1", false, false);
+      controller.mcbopomofoKeyEvent(key);
+      expect(controller.state).toBeInstanceOf(Inputting);
+      state = controller.state;
+      if (state instanceof Inputting) {
+        expect(state.composingBuffer).toBe("中");
+      }
+    });
+
+    it("sets language code", () => {
+      controller.setLanguageCode("zh-TW");
+      controller.setLanguageCode("en");
+      // No exception should be thrown
+    });
+
+    it("sets keyboard layout", () => {
+      const layouts = [
+        "Standard",
+        "ETen",
+        "Hsu",
+        "ETen26",
+        "HanyuPinyin",
+        "IBM",
+        "Unknown",
+      ];
+
+      layouts.forEach((layout) => {
+        controller.setKeyboardLayout(layout);
+        // No exception should be thrown
+      });
+    });
+
+    it("sets select phrase option", () => {
+      controller.setSelectPhrase("after_cursor");
+      controller.setSelectPhrase("before_cursor");
+      controller.setSelectPhrase("invalid_option");
+      // No exception should be thrown
+    });
+
+    it("sets move cursor after selection", () => {
+      controller.setMoveCursorAfterSelection(true);
+      controller.setMoveCursorAfterSelection(false);
+      // No exception should be thrown
+    });
+
+    it("sets letter mode", () => {
+      controller.setLetterMode("lower");
+      controller.setLetterMode("upper");
+      controller.setLetterMode("invalid");
+      // No exception should be thrown
+    });
+
+    it("sets candidate keys", () => {
+      controller.setCandidateKeys("123456789");
+      controller.setCandidateKeys("asdfgh");
+      controller.setCandidateKeys("1234567890abcdefg"); // Too many
+      controller.setCandidateKeys("123"); // Too few
+      controller.setCandidateKeys(undefined as any);
+      // No exception should be thrown
+    });
+
+    it("sets candidate keys count", () => {
+      controller.setCandidateKeysCount(9);
+      controller.setCandidateKeysCount(15);
+      controller.setCandidateKeysCount(3); // Too few
+      controller.setCandidateKeysCount(16); // Too many
+      // No exception should be thrown
+    });
+
+    it("sets moving cursor option", () => {
+      controller.setMovingCursorOption(MovingCursorOption.Disabled);
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      controller.mcbopomofoKeyEvent(key);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      key = new Key("", KeyName.LEFT, true);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(1);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(1);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(0);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(0);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(0);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(0);
+
+      key = new Key("", KeyName.RIGHT, true);
+      controller.mcbopomofoKeyEvent(key);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(2);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(2);
+
+      controller.setMovingCursorOption(MovingCursorOption.UseJK);
+      controller.reset();
+      inputCStr(controller, "5j/ jp6");
+      key = new Key(" ", KeyName.SPACE);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      key = new Key("j", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(1);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(1);
+      key = new Key("k", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(2);
+
+      controller.setMovingCursorOption(MovingCursorOption.UseHL);
+      controller.reset();
+      inputCStr(controller, "5j/ jp6");
+      key = new Key(" ", KeyName.SPACE);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      key = new Key("h", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(1);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(1);
+      key = new Key("l", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      expect((state as ChoosingCandidate).originalCursorIndex).toBe(2);
+      expect((state as ChoosingCandidate).cursorIndex).toBe(2);
+    });
+
+    it("sets ESC clear entire buffer", () => {
+      controller.setEscClearEntireBuffer(true);
+      inputCStr(controller, "5j/ jp6");
+      let state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+      const key = new Key("", KeyName.ESC);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(EmptyIgnoringPrevious);
+      controller.setEscClearEntireBuffer(false);
+    });
+
+    it("sets repeated punctuation choose candidate", () => {
+      controller.setRepeatedPunctuationChooseCandidate(true);
+      inputCStr(controller, "++");
+      const state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+
+      if (state instanceof Inputting) {
+        expect(state.composingBuffer).toBe("＝");
+      }
+      controller.setRepeatedPunctuationChooseCandidate(false);
+    });
+
+    it("sets vertical candidates", () => {
+      controller.setUserVerticalCandidates(true);
+      controller.setUserVerticalCandidates(false);
+      // No exception should be thrown
+    });
+
+    it("sets half width punctuation", () => {
+      controller.setHalfWidthPunctuationEnabled(true);
+      const key = new Key(">", KeyName.ASCII, true);
+      controller.mcbopomofoKeyEvent(key);
+      const state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+
+      if (state instanceof Inputting) {
+        expect(state.composingBuffer).toBe(".");
+      }
+      controller.setHalfWidthPunctuationEnabled(false);
+    });
+
+    it("sets Chinese conversion", () => {
+      controller.setChineseConversionEnabled(true);
+      inputCStr(controller, "z;6fm 5j;4dj;4n0 g/ vul4");
+      const state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+
+      if (state instanceof Inputting) {
+        expect(state.composingBuffer).toBe("防区状况三生效");
+      }
+
+      controller.setChineseConversionEnabled(false);
+    });
+
+    it("sets ctrl enter option", () => {
+      controller.setCtrlEnterOption(CtrlEnterOption.None);
+      controller.setCtrlEnterOption(CtrlEnterOption.BpmfReadings);
+      controller.setCtrlEnterOption(CtrlEnterOption.HtmlRuby);
+      controller.setCtrlEnterOption(CtrlEnterOption.BopomofoBrailleUnicode);
+      controller.setCtrlEnterOption(CtrlEnterOption.BopomofoBrailleASCII);
+      controller.setCtrlEnterOption(CtrlEnterOption.HanyuPinyin);
+      // No exception should be thrown
+    });
+  });
+
+  describe("User Phrases and Callbacks", () => {
+    it("sets user phrases with map", () => {
+      const phrases = new Map<string, string[]>();
+      phrases.set("test", ["測試", "試驗"]);
+      controller.setUserPhrases(phrases);
+      // No exception should be thrown
+    });
+
+    it("sets user phrases with string", () => {
+      controller.setUserPhrases("test phrase string");
+      // No exception should be thrown
+    });
+
+    it("sets excluded phrases", () => {
+      const excludedPhrases = new Map<string, string[]>();
+      excludedPhrases.set("exclude", ["排除"]);
+      controller.setExcludedPhrases(excludedPhrases);
+      controller.setExcludedPhrases("excluded string");
+      // No exception should be thrown
+    });
+
+    it("sets phrase change callbacks", () => {
+      const phraseCallback = jest.fn();
+      const excludedCallback = jest.fn();
+
+      controller.setOnPhraseChange(phraseCallback);
+      controller.setOnExcludedPhraseChange(excludedCallback);
+      // No exception should be thrown
+    });
+
+    it("sets error callback", () => {
+      const errorCallback = jest.fn();
+      controller.setOnError(errorCallback);
+      // No exception should be thrown
+    });
+
+    it("sets open URL callback", () => {
+      const urlCallback = jest.fn();
+      controller.setOnOpenUrl(urlCallback);
+      controller.setOnOpenUrl(undefined);
+      // No exception should be thrown
+    });
+  });
+
+  describe("Input and State Transitions", () => {
+    it("shows correct candidate", () => {
+      inputCStr(controller, "5j/ jp6");
+
+      let state = controller.state;
+      expect(state).toBeInstanceOf(Inputting);
+
+      const space = new Key(" ", KeyName.SPACE, false, false);
+      controller.mcbopomofoKeyEvent(space);
+      controller.mcbopomofoKeyEvent(space);
+      controller.mcbopomofoKeyEvent(space);
+
+      state = controller.state;
+      const parsed = JSON.parse(lastState);
+      const candidates = parsed.candidates;
+      expect(candidates.length).toBe(9);
+    });
+
+    it("handles basic input and produce inputting state", () => {
+      inputChar(controller, "5");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputChar(controller, "j");
+      expect(controller.state).toBeInstanceOf(Inputting);
+    });
+
+    it("handles space key to show candidates", () => {
+      inputCStr(controller, "5j/");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputKey(controller, KeyName.SPACE);
+      // After space, should show candidates
+      const parsed = JSON.parse(lastState);
+      expect(parsed.candidates).toBeDefined();
+    });
+
+    it("handles navigation keys", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      inputKey(controller, KeyName.SPACE);
+
+      // Should handle arrow keys
+      expect(inputKey(controller, KeyName.LEFT)).toBe(true);
+      expect(inputKey(controller, KeyName.RIGHT)).toBe(true);
+      expect(inputKey(controller, KeyName.UP)).toBe(true);
+      expect(inputKey(controller, KeyName.DOWN)).toBe(true);
+      expect(inputKey(controller, KeyName.HOME)).toBe(true);
+      expect(inputKey(controller, KeyName.END)).toBe(true);
+      expect(inputKey(controller, KeyName.PAGE_UP)).toBe(true);
+      expect(inputKey(controller, KeyName.PAGE_DOWN)).toBe(true);
+    });
+
+    it("handles navigation keys", () => {
+      controller.setUserVerticalCandidates(true);
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      inputKey(controller, KeyName.SPACE);
+
+      // Should handle arrow keys
+      expect(inputKey(controller, KeyName.LEFT)).toBe(true);
+      expect(inputKey(controller, KeyName.RIGHT)).toBe(true);
+      expect(inputKey(controller, KeyName.UP)).toBe(true);
+      expect(inputKey(controller, KeyName.DOWN)).toBe(true);
+      expect(inputKey(controller, KeyName.HOME)).toBe(true);
+      expect(inputKey(controller, KeyName.END)).toBe(true);
+      expect(inputKey(controller, KeyName.PAGE_UP)).toBe(true);
+      expect(inputKey(controller, KeyName.PAGE_DOWN)).toBe(true);
+    });
+
+    it("handles escape key", () => {
+      inputCStr(controller, "5j/");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputKey(controller, KeyName.ESC);
+      // ESC typically results in EmptyIgnoringPrevious or Empty
+      expect(
+        controller.state instanceof Empty ||
+          controller.state instanceof EmptyIgnoringPrevious
+      ).toBe(true);
+    });
+
+    it("handles backspace key", () => {
+      inputCStr(controller, "5j/");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputKey(controller, KeyName.BACKSPACE);
+      expect(controller.state).toBeInstanceOf(Inputting);
+    });
+
+    it("handles return key", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      // Return should select candidate
+      expect(inputKey(controller, KeyName.RETURN)).toBe(true);
+    });
+
+    it("handles digit keys for candidate selection", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      // Digit keys should be handled when candidates are available
+      const result = inputChar(controller, "1");
+      expect(typeof result).toBe("boolean");
+    });
+  });
+
+  describe("Candidate Selection", () => {
+    beforeEach(() => {
+      // Set up a state with candidates
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+    });
+
+    it("selects candidate with number keys", () => {
+      const result1 = inputChar(controller, "1");
+      expect(typeof result1).toBe("boolean");
+
+      // Reset for next test
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      const result2 = inputChar(controller, "2");
+      expect(typeof result2).toBe("boolean");
+    });
+
+    it("handles candidate navigation with J/K when enabled", () => {
+      controller.setMovingCursorOption(MovingCursorOption.UseJK);
+
+      const resultJ = inputChar(controller, "j");
+      const resultK = inputChar(controller, "k");
+      expect(typeof resultJ).toBe("boolean");
+      expect(typeof resultK).toBe("boolean");
+    });
+
+    it("handles candidate navigation with J/K when enabled", () => {
+      controller.setMovingCursorOption(MovingCursorOption.UseJK);
+
+      const resultH = inputChar(controller, "h");
+      const resultL = inputChar(controller, "l");
+      expect(typeof resultH).toBe("boolean");
+      expect(typeof resultL).toBe("boolean");
+    });
+
+    it("handles candidate navigation with H/L when enabled", () => {
+      controller.setMovingCursorOption(MovingCursorOption.UseHL);
+
+      const resultH = inputChar(controller, "h");
+      const resultL = inputChar(controller, "l");
+      expect(typeof resultH).toBe("boolean");
+      expect(typeof resultL).toBe("boolean");
+    });
+
+    it("handles candidate navigation with H/L when enabled", () => {
+      controller.setMovingCursorOption(MovingCursorOption.UseHL);
+
+      const resultJ = inputChar(controller, "j");
+      const resultK = inputChar(controller, "k");
+      expect(typeof resultJ).toBe("boolean");
+      expect(typeof resultK).toBe("boolean");
+    });
+  });
+
+  describe("Special Keys and Features", () => {
+    it("enters punctuation list state with backtick", () => {
+      const result = inputChar(controller, "`");
+
+      expect(result).toBe(true);
+      expect(controller.state).toBeInstanceOf(ChoosingPunctuationList);
+
+      const state = controller.state as ChoosingPunctuationList;
+      expect(state.composingBuffer).toBe("　");
+      expect(state.candidates[0].value).toBe("　");
+    });
+
+    it("opens the feature menu when backtick is pressed twice", () => {
+      inputChar(controller, "`");
+      expect(controller.state).toBeInstanceOf(ChoosingPunctuationList);
+
+      const result = inputChar(controller, "`");
+
+      expect(result).toBe(true);
+      expect(controller.state).toBeInstanceOf(SelectingFeature);
+    });
+
+    it("commits punctuation list selections", () => {
+      inputChar(controller, "`");
+      expect(controller.state).toBeInstanceOf(ChoosingPunctuationList);
+
+      const result = inputChar(controller, ",");
+
+      expect(result).toBe(true);
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      const state = controller.state as Inputting;
+      expect(state.composingBuffer).toBe("，");
+    });
+
+    it("cancels punctuation list selection with backspace", () => {
+      inputChar(controller, "`");
+      expect(controller.state).toBeInstanceOf(ChoosingPunctuationList);
+
+      const result = inputKey(controller, KeyName.BACKSPACE);
+
+      expect(result).toBe(true);
+      // Accept Inputting, Empty, or EmptyIgnoringPrevious as valid states
+      const s = controller.state;
+      const isInputting = s instanceof Inputting && s.composingBuffer === "";
+      const isEmpty = s instanceof Empty || s instanceof EmptyIgnoringPrevious;
+      expect(isInputting || isEmpty).toBe(true);
+    });
+
+    it("handles question mark for dictionary", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      const result = inputChar(controller, "?");
+      expect(typeof result).toBe("boolean");
+    });
+
+    it("handles plus/minus keys in simplified mode", () => {
+      controller.setTraditionalMode(false);
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      const resultPlus = inputChar(controller, "+");
+      expect(typeof resultPlus).toBe("boolean");
+
+      // Reset state for next test
+      inputKey(controller, KeyName.ESC);
+
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      const resultMinus = inputChar(controller, "-");
+      expect(typeof resultMinus).toBe("boolean");
+    });
+  });
+
+  describe("UI Integration", () => {
+    it("sets UI component", () => {
+      const newMockUI = createMockUI();
+      controller.setUI(newMockUI as any);
+
+      inputChar(controller, "a");
+      expect(newMockUI.update).toHaveBeenCalled();
+    });
+
+    it("updates UI on state changes", () => {
+      mockUI.update.mockClear();
+
+      inputChar(controller, "5");
+      expect(mockUI.update).toHaveBeenCalled();
+    });
+
+    it("commits string on completion", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      inputChar(controller, "1"); // Select first candidate
+
+      // Check if commitString was called or if state changed appropriately
+      expect(mockUI.commitString.mock.calls.length >= 0).toBe(true);
+    });
+
+    it("resets UI when entering empty state", () => {
+      inputChar(controller, "5");
+      mockUI.reset.mockClear();
+
+      inputKey(controller, KeyName.ESC);
+      expect(mockUI.reset).toHaveBeenCalled();
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("calls error callback when set", () => {
+      const errorCallback = jest.fn();
+      controller.setOnError(errorCallback);
+
+      // Try to trigger an error condition
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      // Try to move cursor beyond bounds
+      controller.setMovingCursorOption(MovingCursorOption.UseJK);
+      // This should trigger error callback when trying to move past bounds
+      for (let i = 0; i < 20; i++) {
+        inputChar(controller, "j"); // Move left beyond bounds
+      }
+    });
+
+    it("handles invalid keyboard events gracefully", () => {
+      const invalidEvent = {} as KeyboardEvent;
+      expect(() => controller.keyEvent(invalidEvent)).not.toThrow();
+    });
+  });
+
+  describe("Complex Input Scenarios", () => {
+    it("handles multiple input sessions", () => {
+      // First input session
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+      inputChar(controller, "1");
+
+      // State should be empty or committed after selection
+      expect(
+        controller.state instanceof Empty ||
+          controller.state instanceof Inputting
+      ).toBe(true);
+
+      // Second input session
+      inputCStr(controller, "jp6");
+      expect(controller.state).toBeInstanceOf(Inputting);
+    });
+
+    it("handles mixed input types", () => {
+      inputChar(controller, "5");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputChar(controller, "j");
+      expect(controller.state).toBeInstanceOf(Inputting);
+
+      inputChar(controller, "/");
+      expect(controller.state).toBeInstanceOf(Inputting);
+    });
+
+    it("maintains state consistency during navigation", () => {
+      inputCStr(controller, "5j/");
+      inputKey(controller, KeyName.SPACE);
+
+      const initialState = controller.state;
+
+      // Navigate through candidates
+      inputKey(controller, KeyName.DOWN);
+      inputKey(controller, KeyName.UP);
+
+      // State should still be valid
+      expect(controller.state).toBeTruthy();
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("handles empty input gracefully", () => {
+      expect(() => inputCStr(controller, "")).not.toThrow();
+    });
+
+    it("handles rapid key presses", () => {
+      for (let i = 0; i < 100; i++) {
+        inputChar(controller, "5");
+        inputKey(controller, KeyName.BACKSPACE);
+      }
+      expect(controller.state).toBeDefined();
+    });
+
+    it("handles undefined/null inputs safely", () => {
+      controller.setCandidateKeys(undefined as any);
+      controller.setUserPhrases(undefined as any);
+      controller.setOnOpenUrl(undefined);
+      // Should not throw
+    });
+  });
+  describe("Big5", () => {
+    it("enters Big5 mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state: InputState = controller.state;
+      expect(state).toBeInstanceOf(SelectingFeature);
+      key = new Key("", KeyName.RETURN, false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Big5);
+      inputCStr(controller, "a143");
+      state = controller.state;
+      expect(state).toBeInstanceOf(Empty);
+    });
+
+    it("enters Big5 mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state: InputState = controller.state;
+      expect(state).toBeInstanceOf(SelectingFeature);
+      key = new Key("1", KeyName.UNKNOWN);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Big5);
+      inputCStr(controller, "a143");
+      state = controller.state;
+      expect(state).toBeInstanceOf(Empty);
+    });
+
+    it("enters and exit Big5 mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state: InputState = controller.state;
+      expect(state).toBeInstanceOf(SelectingFeature);
+      key = new Key("", KeyName.RETURN);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Big5);
+      key = new Key("", KeyName.ESC);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Empty);
+    });
+  });
+
+  describe("Date Macro", () => {
+    it("enters Date Macro mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state: InputState = controller.state;
+      expect(state).toBeInstanceOf(SelectingFeature);
+      key = new Key("2", KeyName.UNKNOWN);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(SelectingDateMacro);
+      key = new Key("3", KeyName.UNKNOWN);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Committing);
+    });
+  });
+
+  describe("Marking", () => {
+    it("enters Marking mode", () => {
+      inputCStr(controller, "jo65j/ ");
+      let key = new Key("", KeyName.LEFT, true);
+      const result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(Marking);
+      controller.mcbopomofoKeyEvent(key);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Marking);
+      if (state instanceof Marking) {
+        expect(state.markedText).toBe("為中");
+      }
+      let getPhrase: any | undefined = undefined;
+      controller.setOnPhraseChange((phrase) => {
+        getPhrase = phrase;
+      });
+      key = new Key("", KeyName.RETURN);
+      controller.mcbopomofoKeyEvent(key);
+      expect(getPhrase).toBeDefined();
+    });
+
+    it("enters Marking mode", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key("", KeyName.LEFT, true);
+      const result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(Marking);
+      controller.mcbopomofoKeyEvent(key);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Marking);
+      if (state instanceof Marking) {
+        expect(state.markedText).toBe("中文");
+      }
+      key = Key.asciiKey("?", true, false);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(SelectingDictionary);
+      let getUrl: string | undefined = undefined;
+      controller.setOnOpenUrl((url: string) => {
+        getUrl = url;
+      });
+
+      key = new Key("", KeyName.DOWN);
+      controller.mcbopomofoKeyEvent(key);
+      key = new Key("", KeyName.DOWN);
+      controller.mcbopomofoKeyEvent(key);
+      key = new Key("", KeyName.RETURN);
+      controller.mcbopomofoKeyEvent(key);
+      expect(getUrl).toBeDefined();
+    });
+  });
+
+  describe("Boost", () => {
+    it("boosts a phrase", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      let getPhrase: any | undefined = undefined;
+      controller.setOnPhraseChange((phrase) => {
+        getPhrase = phrase;
+      });
+
+      key = Key.asciiKey("=", false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(CustomMenu);
+      key = new Key("", KeyName.RETURN);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(getPhrase).toBeDefined();
+    });
+  });
+
+  describe("Exclude", () => {
+    it("excludes a phrase", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      let getPhrase: any | undefined = undefined;
+      controller.setOnExcludedPhraseChange((phrase) => {
+        getPhrase = phrase;
+      });
+
+      key = Key.asciiKey("-", false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(CustomMenu);
+      key = new Key("", KeyName.RETURN);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(getPhrase).toBeDefined();
+    });
+
+    it("enters and exit exclude mode", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      key = Key.asciiKey("-", false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(CustomMenu);
+      key = new Key("", KeyName.ESC);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+    });
+  });
+
+  describe("Selecting Feature", () => {
+    it("enters and exit selecting feature mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state: InputState = controller.state;
+      expect(state).toBeInstanceOf(SelectingFeature);
+      key = new Key("", KeyName.ESC);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(EmptyIgnoringPrevious);
+      expect(mockUI.reset).toHaveBeenCalled();
+    });
+  });
+
+  describe("Selecting Dictionary", () => {
+    it("enters and exit selecting dictionary mode", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      key = Key.asciiKey("?", false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(SelectingDictionary);
+      key = new Key("", KeyName.ESC);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+    });
+
+    it("enters and exit selecting dictionary mode", () => {
+      inputCStr(controller, "5j/ jp6");
+      let key = new Key(" ", KeyName.SPACE);
+      let result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+      key = Key.asciiKey("?", false, false);
+      result = controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(SelectingDictionary);
+      key = new Key("?", KeyName.ESC);
+      result = controller.mcbopomofoKeyEvent(key);
+      expect(result).toBe(true);
+      state = controller.state;
+      expect(state).toBeInstanceOf(ChoosingCandidate);
+    });
+  });
+
+  describe("Arrow Keys", () => {
+    let uiState = { candidates: [] };
+    const ui = {
+      reset: () => {},
+      commitString: (text: string) => {},
+      update: (state: string) => {
+        uiState = JSON.parse(state);
+      },
+    };
+    controller = new InputController(ui);
+    inputCStr(controller, "5j/ jp6");
+    let key = new Key(" ", KeyName.SPACE);
+    const result = controller.mcbopomofoKeyEvent(key);
+    expect(result).toBe(true);
+    const state = controller.state;
+    expect(state).toBeInstanceOf(ChoosingCandidate);
+    {
+      key = new Key("", KeyName.END, true);
+      controller.mcbopomofoKeyEvent(key);
+      const { candidates } = uiState;
+      expect(candidates[0]["candidate"]["value"]).toBe("鴍");
+      key = new Key("", KeyName.END, true);
+    }
+    {
+      key = new Key("", KeyName.HOME, true);
+      controller.mcbopomofoKeyEvent(key);
+      controller.mcbopomofoKeyEvent(key);
+      const { candidates } = uiState;
+      expect(candidates[0]["candidate"]["value"]).toBe("中文");
+    }
+  });
+
+  describe("Number Input", () => {
+    it("enters number input mode", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      controller.mcbopomofoKeyEvent(key);
+      key = new Key("3", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      let state = controller.state;
+      expect(state).toBeInstanceOf(NumberInput);
+      inputCStr(controller, "123");
+      state = controller.state;
+      expect(state).toBeInstanceOf(NumberInput);
+      expect((state as NumberInput).number).toBe("123");
+      key = new Key("", KeyName.RETURN);
+      controller.mcbopomofoKeyEvent(key);
+      state = controller.state;
+      expect(state).toBeInstanceOf(Committing);
+    });
+  });
+
+  describe("Iroha Input", () => {
+    it("enters Iroha mode from feature selection", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      controller.mcbopomofoKeyEvent(key);
+
+      const state = controller.state as SelectingFeature;
+      expect(state).toBeInstanceOf(SelectingFeature);
+
+      const irohaIndex = state.features.findIndex(
+        (feature) => feature.name === "伊呂波假名輸入"
+      );
+      expect(irohaIndex).toBeGreaterThanOrEqual(0);
+
+      key = new Key(String(irohaIndex + 1), KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+      expect(controller.state).toBeInstanceOf(Iroha);
+    });
+
+    it("commits a selected Iroha candidate", () => {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      controller.mcbopomofoKeyEvent(key);
+
+      const featureState = controller.state as SelectingFeature;
+      const irohaIndex = featureState.features.findIndex(
+        (feature) => feature.name === "伊呂波假名輸入"
+      );
+      key = new Key(String(irohaIndex + 1), KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+
+      inputCStr(controller, "a");
+      expect(controller.state).toBeInstanceOf(Iroha);
+
+      key = new Key("", KeyName.SPACE);
+      controller.mcbopomofoKeyEvent(key);
+      expect(controller.state).toBeInstanceOf(IrohaCandidate);
+
+      key = new Key("2", KeyName.UNKNOWN);
+      controller.mcbopomofoKeyEvent(key);
+
+      expect(controller.state).toBeInstanceOf(Committing);
+      expect(mockUI.commitString).toHaveBeenCalledWith("ア");
+    });
+  });
+
+  describe("Getters", () => {
+    it("readableLayoutKeys returns a Map", () => {
+      const keys = controller.readableLayoutKeys;
+      expect(keys).toBeInstanceOf(Map);
+    });
+
+    it("getOnError returns undefined when not set", () => {
+      expect(controller.getOnError()).toBeUndefined();
+    });
+
+    it("getOnError returns the callback when set", () => {
+      const cb = jest.fn();
+      controller.setOnError(cb);
+      expect(controller.getOnError()).toBe(cb);
+    });
+
+    it("preserves onError callback after toggling traditional mode", () => {
+      const cb = jest.fn();
+      controller.setOnError(cb);
+      controller.setTraditionalMode(true);
+      expect(controller.getOnError()).toBe(cb);
+      controller.setTraditionalMode(false);
+      expect(controller.getOnError()).toBe(cb);
+    });
+
+    describe("onError callback edge cases", () => {
+      it("does not call error callback if not set", () => {
+        // Remove any error callback
+        controller.setOnError(undefined as any);
+        // Enter NumberInput and trigger error
+        let key = new Key("\\", KeyName.UNKNOWN, false, true);
+        controller.mcbopomofoKeyEvent(key);
+        const state = controller.state as any;
+        const numberIndex = state.features?.findIndex?.(
+          (f: any) => f.name === "數字輸入"
+        );
+        if (numberIndex !== undefined && numberIndex >= 0) {
+          key = new Key(String(numberIndex + 1), KeyName.UNKNOWN);
+          controller.mcbopomofoKeyEvent(key);
+          // Now in NumberInput, trigger error
+          controller.mcbopomofoKeyEvent(new Key("", KeyName.BACKSPACE));
+          // No error should be thrown, nothing to assert
+        }
+      });
+
+      it("calls error callback exactly once on error", () => {
+        const cb = jest.fn();
+        controller.setOnError(cb);
+        // Enter NumberInput and trigger error
+        let key = new Key("\\", KeyName.UNKNOWN, false, true);
+        controller.mcbopomofoKeyEvent(key);
+        const state = controller.state as any;
+        const numberIndex = state.features?.findIndex?.(
+          (f: any) => f.name === "數字輸入"
+        );
+        if (numberIndex !== undefined && numberIndex >= 0) {
+          key = new Key(String(numberIndex + 1), KeyName.UNKNOWN);
+          controller.mcbopomofoKeyEvent(key);
+          // Now in NumberInput, trigger error
+          controller.mcbopomofoKeyEvent(new Key("", KeyName.BACKSPACE));
+          expect(cb).toHaveBeenCalledTimes(1);
+        }
+      });
+    });
+
+    it("getOnOpenUrl returns undefined when not set", () => {
+      expect(controller.getOnOpenUrl()).toBeUndefined();
+    });
+
+    it("getOnOpenUrl returns the callback when set", () => {
+      const cb = jest.fn();
+      controller.setOnOpenUrl(cb);
+      expect(controller.getOnOpenUrl()).toBe(cb);
+    });
+
+    it("getCtrlEnterOption returns a defined value by default", () => {
+      const option = controller.getCtrlEnterOption();
+      expect(option).toBeDefined();
+    });
+
+    it("getCtrlEnterOption returns the set option", () => {
+      controller.setCtrlEnterOption(CtrlEnterOption.BpmfReadings);
+      expect(controller.getCtrlEnterOption()).toBe(
+        CtrlEnterOption.BpmfReadings
+      );
+    });
+  });
+
+  describe("Configuration Methods", () => {
+    it("setCandidateKeys skips duplicate keys", () => {
+      // "11234567890" has duplicate "1" - should de-dup without throwing
+      controller.setCandidateKeys("11234567890");
+    });
+
+    it("sets Bopomofo font annotation support enabled", () => {
+      controller.setBopomofoFontAnnotationSupportEnabled(true);
+      controller.setBopomofoFontAnnotationSupportEnabled(false);
+    });
+
+    it("setChineseConversionEnabled sets cn2tw converter without throwing", () => {
+      controller.setChineseConversionEnabled(true);
+      controller.setChineseConversionEnabled(false);
+    });
+  });
+
+  describe("simpleKeyboardEvent", () => {
+    it("returns a boolean for a Bopomofo key", () => {
+      const result = controller.simpleKeyboardEvent("5", false, false);
+      expect(typeof result).toBe("boolean");
+    });
+
+    it("returns a boolean for a shifted key", () => {
+      const result = controller.simpleKeyboardEvent("j", true, false);
+      expect(typeof result).toBe("boolean");
+    });
+  });
+
+  describe("Cursor keys in Empty state", () => {
+    it("ignores left cursor key when in empty state", () => {
+      expect(controller.state).toBeInstanceOf(Empty);
+      const leftKey = new Key("", KeyName.LEFT, false, false);
+      expect(controller.mcbopomofoKeyEvent(leftKey)).toBe(false);
+    });
+
+    it("ignores right cursor key when in empty state", () => {
+      expect(controller.state).toBeInstanceOf(Empty);
+      const rightKey = new Key("", KeyName.RIGHT, false, false);
+      expect(controller.mcbopomofoKeyEvent(rightKey)).toBe(false);
+    });
+
+    it("ignores delete key when in empty state", () => {
+      expect(controller.state).toBeInstanceOf(Empty);
+      const delKey = new Key("", KeyName.DELETE, false, false);
+      expect(controller.mcbopomofoKeyEvent(delKey)).toBe(false);
+    });
+  });
+
+  describe("selectCandidateAtIndex", () => {
+    it("selects a candidate by index and leaves ChoosingCandidate", () => {
+      inputCStr(controller, "5j/ ");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.selectCandidateAtIndex(0);
+      expect(controller.state).not.toBeInstanceOf(ChoosingCandidate);
+    });
+
+    it("does nothing for an out-of-range index", () => {
+      inputCStr(controller, "5j/ ");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.selectCandidateAtIndex(999);
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+    });
+  });
+
+  describe("ChoosingCandidate extra key handling", () => {
+    it("ignores single shift tap in candidate window", () => {
+      inputCStr(controller, "5j/ ");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.mcbopomofoKeyEvent(
+        new Key("Shift", KeyName.ASCII, false, false)
+      );
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+    });
+
+    it("cancels candidate panel with ESC", () => {
+      inputCStr(controller, "5j/ ");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.mcbopomofoKeyEvent(new Key("", KeyName.ESC));
+      expect(controller.state).not.toBeInstanceOf(ChoosingCandidate);
+    });
+
+    it("Should not enter custom menu", () => {
+      inputCStr(controller, "w96");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.mcbopomofoKeyEvent(Key.asciiKey("+", false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+    });
+
+    it("custom menu cancel entry restores ChoosingCandidate state", () => {
+      inputCStr(controller, "w96j0 ");
+      controller.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+
+      controller.mcbopomofoKeyEvent(Key.asciiKey("+", false, false));
+      expect(controller.state).toBeInstanceOf(CustomMenu);
+
+      const customMenuState = controller.state as CustomMenu;
+      // Entries are [boost, cancel]. Use numeric key for cancel entry's position.
+      const cancelIndex = customMenuState.entries.length - 1;
+      const cancelKey = String(cancelIndex + 1); // 1-based numeric candidate key
+      controller.mcbopomofoKeyEvent(Key.asciiKey(cancelKey, false, false));
+      expect(controller.state).toBeInstanceOf(ChoosingCandidate);
+    });
+  });
+
+  describe("NumberInput edge cases", () => {
+    function enterNumberInput(ctrl: InputController): void {
+      let key = new Key("\\", KeyName.UNKNOWN, false, true);
+      ctrl.mcbopomofoKeyEvent(key);
+      const state = ctrl.state as SelectingFeature;
+      const numberIndex = state.features.findIndex(
+        (f) => f.name === "數字輸入"
+      );
+      key = new Key(String(numberIndex + 1), KeyName.UNKNOWN);
+      ctrl.mcbopomofoKeyEvent(key);
+    }
+
+    it("triggers error callback when deleting from empty NumberInput", () => {
+      const errorCallback = jest.fn();
+      controller.setOnError(errorCallback);
+      enterNumberInput(controller);
+      expect(controller.state).toBeInstanceOf(NumberInput);
+
+      controller.mcbopomofoKeyEvent(new Key("", KeyName.BACKSPACE));
+      expect(errorCallback).toHaveBeenCalled();
+    });
+
+    it("returns true without state change when NumberInput has no candidates and key not handled", () => {
+      enterNumberInput(controller);
+      expect(controller.state).toBeInstanceOf(NumberInput);
+      expect((controller.state as NumberInput).candidates.length).toBe(0);
+
+      const result = controller.mcbopomofoKeyEvent(
+        Key.asciiKey("a", false, false)
+      );
+      expect(result).toBe(true);
+      expect(controller.state).toBeInstanceOf(NumberInput);
+    });
+  });
+
+  describe("ShowingCharInfo", () => {
+    function enterShowingCharInfo(ctrl: InputController): boolean {
+      inputCStr(ctrl, "5j/ ");
+      ctrl.mcbopomofoKeyEvent(new Key(" ", KeyName.SPACE, false, false));
+      if (!(ctrl.state instanceof ChoosingCandidate)) return false;
+
+      ctrl.mcbopomofoKeyEvent(Key.asciiKey("?", false, false));
+      if (!(ctrl.state instanceof SelectingDictionary)) return false;
+
+      const selectingDict = ctrl.state as SelectingDictionary;
+      const charInfoIndex = selectingDict.menu.findIndex((m) =>
+        m.includes("字元")
+      );
+      if (charInfoIndex < 0) return false;
+
+      for (let i = 0; i < charInfoIndex; i++) {
+        ctrl.mcbopomofoKeyEvent(new Key("", KeyName.DOWN));
+      }
+      ctrl.mcbopomofoKeyEvent(new Key("", KeyName.RETURN));
+      return ctrl.state instanceof ShowingCharInfo;
+    }
+
+    it("selects a candidate from ShowingCharInfo and returns to previous state", () => {
+      const reached = enterShowingCharInfo(controller);
+      if (!reached) return; // service not available; skip gracefully
+
+      controller.mcbopomofoKeyEvent(new Key("", KeyName.RETURN));
+      expect(controller.state).not.toBeInstanceOf(ShowingCharInfo);
+    });
+
+    it("cancels ShowingCharInfo with ESC and returns to SelectingDictionary", () => {
+      const reached = enterShowingCharInfo(controller);
+      if (!reached) return;
+
+      controller.mcbopomofoKeyEvent(new Key("", KeyName.ESC));
+      expect(controller.state).toBeInstanceOf(SelectingDictionary);
+    });
+  });
+});

@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "rootDir": ".",
+    "outDir": "./dist",
+    "strict": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "typeRoots": ["node_modules/@types"],
+    "types": ["jest", "node", "chrome"],
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "output",
+    "coverage",
+    "others",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/chromeos_ime.ts",
+    "src/pime.ts",
+    "src/pime_keys.ts"
+  ]
+}
