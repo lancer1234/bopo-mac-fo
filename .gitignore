@@ -18,3 +18,4 @@
 *.dll
 *.lib
 *.a
+/upstream/PIME/node/input_methods/

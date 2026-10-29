@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot
 $version='0.1.0'
 if(-not $OutputDirectory){$OutputDirectory=Join-Path $repo ('dist\bopo-mac-fo-'+$version+'-windows-x64')}
+$OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Output directory already exists; select a new empty directory.'}
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $payload=Join-Path $OutputDirectory 'payload'
